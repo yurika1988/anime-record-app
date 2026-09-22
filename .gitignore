@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# build outputs
+.next/
+out/
+dist/
+build/
+backend/generated/
+
+# environment
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# testing
+coverage/
+
+# misc
+*.tsbuildinfo
+
+# local anime cover images (keep directory only)
+frontend/public/images/*
+!frontend/public/images/.gitkeep
