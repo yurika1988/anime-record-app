@@ -1,7 +1,9 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import type { Anime, CreateAnimeInput, UpdateAnimeInput } from '../../types/anime';
+import { apiFetch, clearAccessToken, getAccessToken, redirectToLogin } from '../../lib/auth';
+import { resolveImageSrc } from '../../lib/image';
+import type { Anime } from '../../types/anime';
 import AnimeForm, {
   EMPTY_ANIME_FORM,
   STATUS_LABELS,
@@ -9,19 +11,18 @@ import AnimeForm, {
   type AnimeFormValues,
 } from './anime-form';
 
-const API_URL = 'http://localhost:3001/anime';
-
 function AnimeCover({ imageUrl, title }: { imageUrl: string | null; title: string }) {
   const [failed, setFailed] = useState(false);
+  const src = resolveImageSrc(imageUrl);
 
-  if (!imageUrl || failed) {
+  if (!src || failed) {
     return <div className="anime-card-placeholder">画像なし</div>;
   }
 
   return (
     <img
       className="anime-card-image"
-      src={imageUrl}
+      src={src}
       alt={title}
       onError={() => setFailed(true)}
     />
@@ -43,7 +44,7 @@ export default function AnimeListPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(API_URL);
+      const response = await apiFetch('/anime');
       if (!response.ok) {
         throw new Error(`Failed to fetch anime list: ${response.status}`);
       }
@@ -57,8 +58,17 @@ export default function AnimeListPage() {
   }, []);
 
   useEffect(() => {
+    if (!getAccessToken()) {
+      redirectToLogin();
+      return;
+    }
     fetchAnimes();
   }, [fetchAnimes]);
+
+  const handleLogout = () => {
+    clearAccessToken();
+    window.location.href = '/login';
+  };
 
   const closeForm = () => {
     setFormMode(null);
@@ -84,6 +94,8 @@ export default function AnimeListPage() {
       rating: anime.rating != null ? String(anime.rating) : '',
       description: anime.description ?? '',
       imageUrl: anime.imageUrl ?? '',
+      imageFile: null,
+      removeImage: false,
     });
     setFormError(null);
     setDeleteError(null);
@@ -98,7 +110,7 @@ export default function AnimeListPage() {
     setIsSubmitting(true);
     setDeleteError(null);
     try {
-      const response = await fetch(`${API_URL}/${anime.id}`, {
+      const response = await apiFetch(`/anime/${anime.id}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -132,29 +144,39 @@ export default function AnimeListPage() {
     setIsSubmitting(true);
     setFormError(null);
     try {
+      const body = new FormData();
+      body.append('title', trimmedTitle);
+      body.append('status', formValues.status);
+      if (trimmedDescription) {
+        body.append('description', trimmedDescription);
+      } else if (formMode === 'edit') {
+        body.append('description', '');
+      }
+      if (parsedRating !== undefined) {
+        body.append('rating', String(parsedRating));
+      } else if (formMode === 'edit') {
+        body.append('rating', '');
+      }
+
+      if (formValues.imageFile) {
+        body.append('image', formValues.imageFile);
+      } else if (formValues.removeImage) {
+        body.append('removeImage', 'true');
+      } else if (trimmedImageUrl) {
+        body.append('imageUrl', trimmedImageUrl);
+      } else if (formMode === 'edit') {
+        body.append('imageUrl', '');
+      }
+
       const response =
         formMode === 'edit' && editingId
-          ? await fetch(`${API_URL}/${editingId}`, {
+          ? await apiFetch(`/anime/${editingId}`, {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                title: trimmedTitle,
-                status: formValues.status,
-                description: trimmedDescription ? trimmedDescription : null,
-                imageUrl: trimmedImageUrl ? trimmedImageUrl : null,
-                rating: parsedRating ?? null,
-              } satisfies UpdateAnimeInput),
+              body,
             })
-          : await fetch(API_URL, {
+          : await apiFetch('/anime', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                title: trimmedTitle,
-                status: formValues.status,
-                ...(trimmedDescription ? { description: trimmedDescription } : {}),
-                ...(trimmedImageUrl ? { imageUrl: trimmedImageUrl } : {}),
-                ...(parsedRating !== undefined ? { rating: parsedRating } : {}),
-              } satisfies CreateAnimeInput),
+              body,
             });
 
       if (!response.ok) {
@@ -178,14 +200,24 @@ export default function AnimeListPage() {
     <main className="page">
       <header className="page-header">
         <h1>アニメ一覧</h1>
-        <button
-          className="btn btn-primary"
-          type="button"
-          onClick={openCreateForm}
-          disabled={isSubmitting}
-        >
-          アニメを追加
-        </button>
+        <div className="page-header-actions">
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={openCreateForm}
+            disabled={isSubmitting}
+          >
+            アニメを追加
+          </button>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={handleLogout}
+            disabled={isSubmitting}
+          >
+            ログアウト
+          </button>
+        </div>
       </header>
 
       {formMode && (

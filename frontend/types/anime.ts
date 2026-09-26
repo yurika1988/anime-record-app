@@ -11,6 +11,7 @@ export type Anime = {
   finishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  userId: string;
 };
 
 export type CreateAnimeInput = {

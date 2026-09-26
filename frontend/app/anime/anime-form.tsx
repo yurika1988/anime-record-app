@@ -1,6 +1,7 @@
 'use client';
 
-import type { FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { resolveImageSrc } from '../../lib/image';
 import type { AnimeStatus } from '../../types/anime';
 
 export const ANIME_STATUSES: AnimeStatus[] = [
@@ -23,6 +24,8 @@ export type AnimeFormValues = {
   rating: string;
   description: string;
   imageUrl: string;
+  imageFile: File | null;
+  removeImage: boolean;
 };
 
 export const EMPTY_ANIME_FORM: AnimeFormValues = {
@@ -31,6 +34,8 @@ export const EMPTY_ANIME_FORM: AnimeFormValues = {
   rating: '',
   description: '',
   imageUrl: '',
+  imageFile: null,
+  removeImage: false,
 };
 
 type AnimeFormProps = {
@@ -58,6 +63,30 @@ export function validateAnimeForm(values: AnimeFormValues): string | null {
   return null;
 }
 
+function FormImagePreview({ values }: { values: AnimeFormValues }) {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!values.imageFile) {
+      setObjectUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(values.imageFile);
+    setObjectUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [values.imageFile]);
+
+  const src =
+    objectUrl ??
+    (values.removeImage ? null : resolveImageSrc(values.imageUrl));
+
+  if (!src) {
+    return <div className="image-preview image-preview-empty">画像なし</div>;
+  }
+
+  return <img className="image-preview" src={src} alt="" />;
+}
+
 export default function AnimeForm({
   mode,
   values,
@@ -68,6 +97,7 @@ export default function AnimeForm({
   onCancel,
 }: AnimeFormProps) {
   const isCreate = mode === 'create';
+  const fileSelected = Boolean(values.imageFile);
 
   return (
     <form className="form-card" onSubmit={onSubmit}>
@@ -123,16 +153,61 @@ export default function AnimeForm({
       </div>
 
       <div className="form-field">
+        <label htmlFor="anime-image-file">画像ファイル</label>
+        <input
+          id="anime-image-file"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          onChange={(event) => {
+            const file = event.target.files?.[0] ?? null;
+            onChange({
+              ...values,
+              imageFile: file,
+              removeImage: false,
+            });
+          }}
+          disabled={isSubmitting}
+        />
+        <p className="field-hint">JPEG / PNG / WebP、5MBまで。ファイル指定時は画像URLより優先されます。</p>
+      </div>
+
+      <div className="form-field">
         <label htmlFor="anime-image-url">画像URL</label>
         <input
           id="anime-image-url"
-          type="url"
+          type="text"
           inputMode="url"
-          placeholder="https://..."
+          placeholder="https://... または /images/tensura.jpeg"
           value={values.imageUrl}
-          onChange={(event) => onChange({ ...values, imageUrl: event.target.value })}
-          disabled={isSubmitting}
+          onChange={(event) =>
+            onChange({
+              ...values,
+              imageUrl: event.target.value,
+              removeImage: false,
+            })
+          }
+          disabled={isSubmitting || fileSelected}
         />
+      </div>
+
+      <FormImagePreview values={values} />
+
+      <div className="form-field">
+        <button
+          className="btn btn-secondary"
+          type="button"
+          onClick={() =>
+            onChange({
+              ...values,
+              imageFile: null,
+              imageUrl: '',
+              removeImage: true,
+            })
+          }
+          disabled={isSubmitting}
+        >
+          画像を削除
+        </button>
       </div>
 
       <div className="form-field">

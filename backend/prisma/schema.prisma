@@ -15,6 +15,15 @@ enum AnimeStatus {
   DROPPED
 }
 
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  animes       Anime[]
+}
+
 model Anime {
   id          String      @id @default(uuid())
   title       String
@@ -26,4 +35,8 @@ model Anime {
   finishedAt  DateTime?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

@@ -14,6 +14,7 @@ backend/generated/
 .env
 .env.*
 !.env.example
+!backend/.env.example
 
 # logs
 *.log
@@ -38,3 +39,6 @@ coverage/
 # local anime cover images (keep directory only)
 frontend/public/images/*
 !frontend/public/images/.gitkeep
+
+# uploaded files (Docker named volume in compose)
+backend/uploads/
